@@ -361,12 +361,12 @@ func showMenu() {
 	m, _, _ := pCreatePopupMenu.Call()
 	defer pDestroyMenu.Call(m)
 	pAppendMenu.Call(m, mfString, 1, uintptr(unsafe.Pointer(u16("Open JARVIS"))))
+	pAppendMenu.Call(m, mfString, 4, uintptr(unsafe.Pointer(u16("Show the JARVIS interface"))))
 	top := uintptr(mfString)
 	if onTop {
 		top |= mfChecked
 	}
 	pAppendMenu.Call(m, top, 6, uintptr(unsafe.Pointer(u16("Keep JARVIS on top of other windows"))))
-	pAppendMenu.Call(m, mfString, 4, uintptr(unsafe.Pointer(u16("Reload JARVIS"))))
 	pAppendMenu.Call(m, mfString, 8, uintptr(unsafe.Pointer(u16("Go to the Claude sign-in page"))))
 	pAppendMenu.Call(m, mfString, 7, uintptr(unsafe.Pointer(u16("Sign in again (reset JARVIS)"))))
 	flags := uintptr(mfString)

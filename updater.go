@@ -14,7 +14,7 @@ import (
 	"time"
 )
 
-const appVersion = "4.2.0"
+const appVersion = "4.2.1"
 
 // updateRepo is the GitHub "owner/repo" that holds JARVIS releases.
 const updateRepo = "legogamer0310-sudo/jarvis"
@@ -131,7 +131,7 @@ func startUpdater() {
 		time.Sleep(20 * time.Second)
 		for {
 			checkUpdate()
-			time.Sleep(6 * time.Hour)
+			time.Sleep(time.Hour)
 		}
 	}()
 }

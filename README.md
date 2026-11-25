@@ -8,7 +8,7 @@ Download **[JARVIS.exe](dist/JARVIS.exe)** (click it, then the download button) 
 
 ## Updates
 
-JARVIS reads `version.txt` here a little after he starts and every 6 hours. When it names a newer version, he downloads `dist/JARVIS.exe`, quietly, and switches to it the next time his window is closed.
+JARVIS reads `version.txt` here a little after he starts and every hour. When it names a newer version, he downloads `dist/JARVIS.exe`, quietly, and switches to it the next time his window is closed.
 
 ## Building
 

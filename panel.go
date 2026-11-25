@@ -95,6 +95,16 @@ func embed() bool {
 		return false
 	}
 	embedded = true
+	// After signing in, claude.ai lands on its chat page. Send JARVIS's window
+	// straight back to the JARVIS interface instead (sign-in pages are left alone).
+	browser.Init(`(function(){try{
+  if (window.top !== window || location.hostname !== 'claude.ai') return;
+  var p = location.pathname;
+  if (p === '/' || p.indexOf('/new') === 0 || p.indexOf('/chat') === 0 || p.indexOf('/recents') === 0 ||
+      p.indexOf('/project') === 0 || p.indexOf('/onboarding') === 0 || p.indexOf('/settings') === 0) {
+    location.replace('` + jarvisURL + `');
+  }
+}catch(e){}})();`)
 	browser.Resize()
 	browser.Navigate(jarvisURL)
 	return true
