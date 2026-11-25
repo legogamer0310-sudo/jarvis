@@ -4,6 +4,7 @@ package main
 // quietly, and swaps it in the next time his window is closed.
 
 import (
+	"bytes"
 	"io"
 	"net/http"
 	"os"
@@ -14,7 +15,7 @@ import (
 	"time"
 )
 
-const appVersion = "4.2.1"
+const appVersion = "4.2.2"
 
 // updateRepo is the GitHub "owner/repo" that holds JARVIS releases.
 const updateRepo = "legogamer0310-sudo/jarvis"
@@ -67,7 +68,19 @@ func checkUpdate() {
 	if r.StatusCode != 200 || !newer(string(b), appVersion) {
 		return
 	}
-	resp, err := get(base+"dist/JARVIS.exe", 10*time.Minute)
+	want := strings.TrimSpace(string(b))
+	// Loop guard: if we already installed this version and are still older,
+	// the download was stale; don't try that version again for a day.
+	tried := filepath.Join(dataDir(), "update-tried.txt")
+	if t, e := os.ReadFile(tried); e == nil {
+		f := strings.Fields(string(t))
+		if len(f) == 2 && f[0] == want {
+			if at, e := strconv.ParseInt(f[1], 10, 64); e == nil && time.Since(time.Unix(at, 0)) < 24*time.Hour {
+				return
+			}
+		}
+	}
+	resp, err := get(base+"dist/JARVIS.exe?v="+want+"&t="+strconv.FormatInt(time.Now().Unix(), 10), 10*time.Minute)
 	if err != nil {
 		return
 	}
@@ -91,9 +104,22 @@ func checkUpdate() {
 		os.Remove(dst)
 		return
 	}
+	// Never "update" to a file that is the same as the one running.
+	if same(dst, exePath()) {
+		os.Remove(dst)
+		os.WriteFile(tried, []byte(want+" "+strconv.FormatInt(time.Now().Unix(), 10)), 0o644)
+		return
+	}
+	os.WriteFile(tried, []byte(want+" "+strconv.FormatInt(time.Now().Unix(), 10)), 0o644)
 	updMu.Lock()
 	updReady = dst
 	updMu.Unlock()
+}
+
+func same(a, b string) bool {
+	x, e1 := os.ReadFile(a)
+	y, e2 := os.ReadFile(b)
+	return e1 == nil && e2 == nil && bytes.Equal(x, y)
 }
 
 // maybeApplyUpdate swaps in a downloaded update when JARVIS's window is closed.
