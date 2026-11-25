@@ -4,7 +4,6 @@ package main
 // quietly, and swaps it in the next time his window is closed.
 
 import (
-	"encoding/json"
 	"io"
 	"net/http"
 	"os"
@@ -45,69 +44,56 @@ func newer(a, b string) bool { // is a newer than b?
 	return false
 }
 
+// checkUpdate reads version.txt from the GitHub page; if it names a newer
+// version, it downloads dist/JARVIS.exe next to the installed copy.
 func checkUpdate() {
 	if strings.HasPrefix(updateRepo, "OWNER/") {
 		return
 	}
-	cl := http.Client{Timeout: 30 * time.Second}
-	req, _ := http.NewRequest("GET", "https://api.github.com/repos/"+updateRepo+"/releases/latest", nil)
-	req.Header.Set("User-Agent", "JARVIS-app")
-	req.Header.Set("Accept", "application/vnd.github+json")
-	r, err := cl.Do(req)
+	base := "https://raw.githubusercontent.com/" + updateRepo + "/main/"
+	get := func(url string, timeout time.Duration) (*http.Response, error) {
+		cl := http.Client{Timeout: timeout}
+		req, _ := http.NewRequest("GET", url, nil)
+		req.Header.Set("User-Agent", "JARVIS-app")
+		req.Header.Set("Cache-Control", "no-cache")
+		return cl.Do(req)
+	}
+	r, err := get(base+"version.txt?t="+strconv.FormatInt(time.Now().Unix(), 10), 30*time.Second)
 	if err != nil {
 		return
 	}
-	defer r.Body.Close()
-	if r.StatusCode != 200 {
+	b, _ := io.ReadAll(io.LimitReader(r.Body, 64))
+	r.Body.Close()
+	if r.StatusCode != 200 || !newer(string(b), appVersion) {
 		return
 	}
-	var rel struct {
-		Tag    string `json:"tag_name"`
-		Assets []struct {
-			Name string `json:"name"`
-			URL  string `json:"browser_download_url"`
-			Size int64  `json:"size"`
-		} `json:"assets"`
-	}
-	if json.NewDecoder(r.Body).Decode(&rel) != nil || !newer(rel.Tag, appVersion) {
+	resp, err := get(base+"dist/JARVIS.exe", 10*time.Minute)
+	if err != nil {
 		return
 	}
-	for _, a := range rel.Assets {
-		if !strings.EqualFold(a.Name, "JARVIS.exe") {
-			continue
-		}
-		dl := http.Client{Timeout: 10 * time.Minute}
-		req, _ := http.NewRequest("GET", a.URL, nil)
-		req.Header.Set("User-Agent", "JARVIS-app")
-		resp, err := dl.Do(req)
-		if err != nil {
-			return
-		}
-		defer resp.Body.Close()
-		if resp.StatusCode != 200 {
-			return
-		}
-		dst := filepath.Join(installDir(), "JARVIS.new.exe")
-		f, err := os.Create(dst)
-		if err != nil {
-			return
-		}
-		n, err := io.Copy(f, resp.Body)
-		f.Close()
-		head := make([]byte, 2)
-		if g, e := os.Open(dst); e == nil {
-			g.Read(head)
-			g.Close()
-		}
-		if err != nil || n < 500_000 || (a.Size > 0 && n != a.Size) || string(head) != "MZ" {
-			os.Remove(dst)
-			return
-		}
-		updMu.Lock()
-		updReady = dst
-		updMu.Unlock()
+	defer resp.Body.Close()
+	if resp.StatusCode != 200 {
 		return
 	}
+	dst := filepath.Join(installDir(), "JARVIS.new.exe")
+	f, err := os.Create(dst)
+	if err != nil {
+		return
+	}
+	n, err := io.Copy(f, resp.Body)
+	f.Close()
+	head := make([]byte, 2)
+	if g, e := os.Open(dst); e == nil {
+		g.Read(head)
+		g.Close()
+	}
+	if err != nil || n < 500_000 || (resp.ContentLength > 0 && n != resp.ContentLength) || string(head) != "MZ" {
+		os.Remove(dst)
+		return
+	}
+	updMu.Lock()
+	updReady = dst
+	updMu.Unlock()
 }
 
 // maybeApplyUpdate swaps in a downloaded update when JARVIS's window is closed.
